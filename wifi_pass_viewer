@@ -1,0 +1,85 @@
+import subprocess
+from sys import platform 
+import qrcode
+import platform
+
+def get_wifi_pass_Windows():
+    profiles = subprocess.check_output(## Execute the command to get all wifi profiles
+        "netsh wlan show profiles", shell=True 
+    ).decode()
+
+    names = [
+        line.split(":")[1].strip() ## Extract the profile name
+        for line in profiles.split("\n") 
+        if "All User Profile" in line
+    ]
+
+    for i, name in enumerate(names,1): # Show the profiles names with index
+        print(f"{i} -> {name}")
+
+    choice = int(input("Enter the index of the profile to view the password: ")) 
+    wifi = names[choice - 1]
+
+    password = subprocess.check_output(
+        f'netsh wlan show profile name="{wifi}" key=clear', shell=True
+    ).decode()
+
+    print(f"Password for {wifi}: {password}")
+
+    return wifi, password
+
+def get_wifi_pass_Linux():
+    profiles = subprocess.check_output(
+        "nmcli -f NAME,TYPE connection show | grep wifi", shell=True        
+    ).decode()
+
+    names = [
+        line.strip() for line in profiles.split("\n")
+    ]
+    print("Available Wi-Fi Profiles:")
+    for i, name in enumerate (names,1):
+        if name: # Check if the name is not empty
+            print(f"{i} -> {name.split()[0]}")
+
+    choice = int(input("Enter the index of the profile to view the password: "))
+    wifi = names[choice - 1].split()[0]
+
+    password = subprocess.check_output(
+        f"nmcli -s -g 802-11-wireless-security.psk connection show '{wifi}'", shell=True
+    ).decode()
+
+    print(f"Password for {wifi}: {password}")
+
+    return wifi, password
+
+def generate_qr_code(wifi, password): # Function to generate QR code
+    wifi_uri = f"WIFI:T:WPA2;S:{wifi};P:{password};H:false;;" # Create a wifi URI
+
+    qr = qrcode.QRCode(
+        version = 1,
+        error_correction = qrcode.constants.ERROR_CORRECT_L,
+        box_size = 5,
+        border = 1
+    )
+
+    qr.add_data(wifi_uri) # Add the wifi URI to the QR code
+    qr.make(fit=True)
+
+    qr.print_ascii() # Print the QR code in ASCII format
+
+if(__name__ == "__main__"):
+    wifi, password = None, None
+    os_name = platform.system() # Get the operating system
+    match os_name:
+        case "Windows":
+            get_wifi_pass_Windows() # Call the function to get wifi password
+            wifi, password = get_wifi_pass_Windows() # Get the wifi name and password
+        case "Linux":
+            wifi, password = get_wifi_pass_Linux() 
+        case "Mac":
+            print("Mac OS is not supported yet")
+        case _:
+            print("Operating system not supported")
+
+    if wifi and password: # Check if wifi and password are not None
+        generate_qr_code(wifi, password) # Call the function to generate QR code    
